@@ -1,0 +1,73 @@
+stages:
+  - build
+  - docker_image_manual
+  # - deploy_railway_prod
+
+cache:
+  key: '${CI_COMMIT_REF_SLUG}'
+  paths:
+    - node_modules/
+    - pnpm-lock.yaml
+
+default:
+  image: 'node:19-alpine3.16'
+  before_script:
+    - apk update && apk upgrade -U -a
+    - apk add wget curl
+    - >-
+      wget -qO /bin/pnpm
+      "https://github.com/pnpm/pnpm/releases/latest/download/pnpm-linuxstatic-x64"
+      && chmod +x /bin/pnpm
+    - pnpm config set store-dir .pnpm-store
+    - export GITLAB_PROJECT_NAME=loc-track-back
+    - export TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHA:0:8}"
+    - export DOCKER_REGISTRY_IMAGE=$DOCKER_REGISTRY_PREFIX/$GITLAB_PROJECT_NAME # nordclan.dev:9876/cidi-example/java-backend
+
+build:
+  stage: build
+  tags:
+    - docker
+  cache:
+    key: '${CI_COMMIT_REF_SLUG}'
+    paths:
+      - node_modules/
+      - pnpm-lock.yaml
+    when: on_success
+    policy: pull-push
+  script:
+    - pnpm i
+    - pnpm build
+  only:
+    - branches
+
+#* --- MANUAL_ONLY_DEVELOP --- *#
+variables:
+  DOCKER_DEPLOY:
+    value: '0'
+    description: 'Сборка и деплой docker'
+
+# *--- docker --- *#
+docker_image:
+  stage: docker_image_manual
+  tags:
+    - docker
+  only:
+    variables:
+      - $DOCKER_DEPLOY == "1"
+  script:
+    - apk add --update docker openrc
+    - service docker start
+    - docker login -u $DOCKER_REGISTRY_USER -p $DOCKER_REGISTRY_PASS $DOCKER_REGISTRY
+    - docker build --rm --build-arg VERSION=$TAG --tag $DOCKER_REGISTRY_IMAGE:$TAG .
+    - docker push $DOCKER_REGISTRY_IMAGE:$TAG
+#* -------------- *#
+
+#* --- deploy on railway --- *#
+# deploy vercel prod:
+#   stage: deploy_railway_prod
+#   only:
+#     - master
+#   script:
+#     - curl -fsSL https://railway.app/install.sh | sh
+#     - railway up --service=$RAILWAY_SERVICE_NAME -d
+#* ------------------------ *#

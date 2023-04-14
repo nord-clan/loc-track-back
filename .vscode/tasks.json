@@ -1,0 +1,26 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "dev",
+      "problemMatcher": [],
+      "label": "npm: dev",
+      "detail": "ts-node-dev --respawn --pretty --transpile-only -r tsconfig-paths/register src/server.ts"
+    },
+    {
+      "type": "npm",
+      "script": "prisma:generate",
+      "problemMatcher": [],
+      "label": "npm: prisma:generate",
+      "detail": "prisma generate"
+    },
+    {
+      "type": "npm",
+      "script": "prisma:format",
+      "problemMatcher": [],
+      "label": "npm: prisma:format",
+      "detail": "prisma format"
+    }
+  ]
+}

@@ -1,0 +1,308 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator pothos {
+  provider = "prisma-pothos-types"
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+//* ==== Models ==================================================================== *//
+
+model RefreshToken {
+  id          String   @id @unique @default(uuid())
+  hashedToken String   @db.Text
+  userId      String
+  revoked     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  User User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  id        String   @id @unique @default(uuid())
+  userId    String
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  User User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model User {
+  id               String  @id @unique @default(uuid())
+  login            String  @unique
+  password         String  @unique
+  avatar           String?
+  city             String?
+  firstName        String?
+  lastName         String?
+  telegramUserName String?
+  mobile           String?
+  personalMail     String?
+
+  birthDate      DateTime?
+  dismissalDate  DateTime?
+  employmentDate DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+
+  role ERole @default(User)
+
+  RefreshToken       RefreshToken[]
+  VerificationToken  VerificationToken[]
+  UsersOnDepartments UsersOnDepartments[]
+  UsersSkills        UsersSkills[]
+  UsersOnNode        UsersOnNode[]
+  Events             Event[]
+  UsersOnEvent       UsersOnEvent[]
+
+  EventInvitesCreator EventInvites[] @relation("creator")
+  EventInvites        EventInvites[] @relation("user")
+}
+
+model Office {
+  id        String   @id @unique @default(uuid())
+  name      String   @unique
+  city      String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  Layers Layer[]
+}
+
+model Layer {
+  id       String  @id @unique @default(uuid())
+  index    Int
+  name     String
+  img      String?
+  officeId String
+
+  // zoomInterval Float[]
+  // diagramSize Int?
+  // diagramPadding Int[]
+  // callOnImportState Boolean?
+
+  Nodes  Node[]
+  Office Office @relation(fields: [officeId], references: [id])
+
+  @@index([officeId])
+}
+
+
+model Node {
+  id      String  @id @unique @default(uuid())
+  pos     Float[]
+  width   Int
+  height  Int
+  angle   Int     @default(0)
+  type    String
+  layerId String
+
+  UsersOnNode UsersOnNode[]
+  Events      Event[]
+  NodeData    NodeData?
+
+  NodeType NodeType     @relation(fields: [type], references: [name])
+  Layer    Layer        @relation(fields: [layerId], references: [id])
+  FromNode NodesLinks[] @relation("fromNode")
+  ToNode   NodesLinks[] @relation("toNode")
+
+  @@index([type])
+  @@index([layerId])
+}
+
+model NodeData {
+  nodeId String @unique
+
+  index         Int     @default(autoincrement())
+  allowMove     Boolean @default(true)
+  allowResize   Boolean @default(true)
+  backgroundSrc String?
+  customCss     String? @db.Text
+
+  Node Node @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+}
+
+model NodesLinks {
+  fromNodeId String
+  toNodeId   String
+  type       ENodesLinksFormType @default(Bezier)
+
+  FromNode Node @relation("toNode", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  ToNode   Node @relation("fromNode", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  @@id([fromNodeId, toNodeId])
+  @@index([fromNodeId])
+  @@index([toNodeId])
+}
+
+model NodeType {
+  name          String  @unique
+  size          Float[]
+  numberOfUsers Int     @default(1)
+
+  createdAt DateTime @default(now())
+
+  Nodes Node[]
+
+  @@id([name])
+}
+
+model UsersOnNode {
+  id     String @id @unique @default(uuid())
+  nodeId String
+  userId String
+
+  createdAt      DateTime  @default(now())
+  activationAt   DateTime
+  deactivationAt DateTime?
+
+  Node Node @relation(fields: [nodeId], references: [id])
+  User User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([nodeId])
+}
+
+model Department {
+  id   String      @id @unique @default(uuid())
+  name String
+  type EDepartment
+
+  UsersOnDepartments UsersOnDepartments[]
+}
+
+model UsersOnDepartments {
+  userId       String
+  departmentId String
+
+  assignedAt DateTime @default(now())
+
+  User       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, departmentId])
+  @@index([departmentId])
+  @@index([userId])
+}
+
+model Event {
+  id             String        @id @unique @default(uuid())
+  name           String
+  description    String
+  img            String
+  nodeId         String?
+  createdBy      String
+  createdAt      DateTime      @default(now())
+  activationAt   DateTime      @default(now())
+  deactivationAt DateTime
+  privacy        EEventPrivacy @default(Public)
+
+  Node         Node?          @relation(fields: [nodeId], references: [id])
+  User         User           @relation(fields: [createdBy], references: [id])
+  UsersOnEvent UsersOnEvent[]
+  EventInvites EventInvites[]
+
+  @@index([createdBy])
+  @@index([nodeId])
+}
+
+model EventInvites {
+  eventId   String
+  userId    String
+  createdBy String
+
+  Event   Event @relation(fields: [eventId], references: [id])
+  User    User  @relation("user", fields: [userId], references: [id])
+  Creator User  @relation("creator", fields: [createdBy], references: [id])
+
+  @@id([eventId, userId, createdBy])
+  @@index([createdBy])
+  @@index([userId])
+  @@index([eventId])
+}
+
+model UsersOnEvent {
+  userId     String
+  eventId    String
+  assignedAt DateTime @default(now())
+
+  User  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@id([userId, eventId])
+  @@index([userId])
+  @@index([eventId])
+}
+
+model SkillBasement {
+  id          String        @id @unique @default(uuid())
+  name        String        @unique
+  level       String
+  usersSkills UsersSkills[]
+}
+
+model UsersSkills {
+  userId          String
+  skillBasementId String
+  assignedAt      DateTime @default(now())
+
+  User          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  SkillBasement SkillBasement? @relation(fields: [skillBasementId], references: [id], onDelete: Cascade)
+
+  @@id([userId, skillBasementId])
+  @@index([userId])
+  @@index([skillBasementId])
+}
+
+//* ==== Enums ==================================================================== *//
+enum EDepartment {
+  Department
+  Office
+  Subdivision
+}
+
+enum ERole {
+  User
+  Admin
+}
+
+enum EEventPrivacy {
+  Public
+  Private
+  Invitation
+}
+
+enum ENodesLinksFormType {
+  Hermit //* Эрмита
+  CatmallaRoma //* Кэтмалла-Рома
+  Bezier //* Bézier
+  BSpline //* Б-spline
+  NURBS //* NURBS
+  HodgeJohnson //* Ходжа-Джонсона
+}
+
+model GqlMetric {
+  id            String  @id @unique @default(uuid())
+  name          String?
+  duration      Float
+  description   String?
+  kind          String
+  args          Json?
+  parentType    String
+  pothosOptions Json?
+}
