@@ -24,7 +24,7 @@ builder.prismaObject('Node', {
         to: t.arg({ type: 'TimestampTZ', required: false })
       },
       resolve: async (query, root, args) => {
-        const at = args?.at ?? new Date();
+        const at = args?.at ?? new Date(new Date().setHours(0, 0, 0, 0));
         const to = args?.to ?? new Date(new Date().setDate(new Date().getDate() + 1));
 
         return userOnNodeService.getByWhere({
