@@ -3,8 +3,7 @@ import prisma from '#/prisma';
 
 class NodeDataService {
   //* C
-  post = async <TData>(data: TData) =>
-    prisma.nodeData.create({ data: data as Prisma.NodeDataCreateInput });
+  post = async <T>(data: T) => prisma.nodeData.create({ data: data as Prisma.NodeDataCreateInput });
 
   //* R
 

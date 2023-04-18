@@ -1,4 +1,8 @@
 import type { Prisma } from '@prisma/client';
+import type { IUserTrack } from '#/models/user';
+import type { IUserSignInInput } from '#/graphql/models/user/mutation';
+import type { IUserTrackResponse } from '#/models/common';
+import axios from 'axios';
 import prisma from '#/prisma';
 import { hashToken } from '#/graphql/utils/hash-token';
 
@@ -14,6 +18,16 @@ class AuthService {
         userId
       }
     });
+  };
+
+  authWithTracker = async (payload: IUserSignInInput) => {
+    const { data } = await axios.post<IUserTrackResponse>(
+      'http://track.nordclan/api/v1/auth/login',
+      {
+        ...payload
+      }
+    );
+    return data;
   };
 
   //* R

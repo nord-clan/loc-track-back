@@ -42,16 +42,19 @@ model VerificationToken {
 }
 
 model User {
-  id               String  @id @unique @default(uuid())
-  login            String  @unique
-  password         String  @unique
-  avatar           String?
-  city             String?
-  firstName        String?
-  lastName         String?
-  telegramUserName String?
-  mobile           String?
-  personalMail     String?
+  id             String  @id @unique @default(uuid())
+  login          String  @unique
+  password       String  @unique
+  avatar         String?
+  city           String?
+  firstName      String?
+  lastName       String?
+  telegram       String?
+  mobile         String?
+  emailPersonal  String?
+  emailSecondary String?
+  status         String?
+  country        String?
 
   birthDate      DateTime?
   dismissalDate  DateTime?
@@ -101,7 +104,6 @@ model Layer {
 
   @@index([officeId])
 }
-
 
 model Node {
   id      String  @id @unique @default(uuid())

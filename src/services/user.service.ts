@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import type { IUserSignUpInput } from '#/graphql/models/user/mutation';
+import type { IUser } from '#/models/user';
 import bcrypt from 'bcryptjs';
 import prisma from '#/prisma';
 
@@ -14,14 +15,14 @@ class UserService {
   //* R
   getAll = async () => prisma.user.findMany();
 
-  getAllByWhere = async <TQuery>(payload: IReadPayload<TQuery>) =>
+  getAllByWhere = async <T>(payload: IWherePayload<T>) =>
     prisma.user.findMany({ ...payload.query, where: payload.where });
 
-  getByWhere = async <TQuery>(payload: IReadPayload<TQuery>) =>
+  getByWhere = async <T>(payload: IWherePayload<T>) =>
     prisma.user.findFirst({ ...payload.query, where: payload.where });
 
   //* U
-  update = async <TQuery>(payload: IUpdatePayload<TQuery>) =>
+  update = async <T>(payload: IUpdatePayload<T>) =>
     prisma.user.update({
       ...payload.query,
       where: payload.where,
@@ -35,13 +36,12 @@ export default UserService;
 
 //* ==== Interfaces ==================================================================== *//
 
-interface IReadPayload<TQuery> {
-  query?: TQuery;
+interface IWherePayload<T> {
+  query?: T;
   where?: Prisma.UserWhereInput;
 }
 
-interface IUpdatePayload<TQuery> {
-  query?: TQuery;
+interface IUpdatePayload<T> extends Pick<IWherePayload<T>, 'query'> {
   where: Prisma.UserWhereUniqueInput;
   data: Prisma.UserUpdateInput;
 }

@@ -10,6 +10,7 @@ export const authenticateUser = async (
   request: YogaInitialContext['request']
 ) => {
   const header = request.headers.get('authorization');
+
   if (header !== null) {
     try {
       const token = header.split(' ')[1];

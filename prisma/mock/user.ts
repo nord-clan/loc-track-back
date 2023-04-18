@@ -8,30 +8,18 @@ export const users = [
     password: faker.datatype.uuid(),
     createdAt: faker.date.past(),
     updatedAt: faker.date.future(),
-    avatar: faker.image.abstract(500, 500, true)
-
-    // skills: [],
-    // city: faker.address.city(),
-    // employmentDate: faker.date.past(),
-    // dismissalDate: faker.date.past(),
-    // departments: [],
-    // login: faker.internet.userName(),
-    // vacationUser: {
-    //   availableVacationDaysNow: faker.datatype.number(100),
-    //   availableVacationDaysEndYear: faker.datatype.number(100),
-    //   usedDaysVacationNow: faker.datatype.number(100),
-    //   usedDaysVacationThisYear: faker.datatype.number(100)
-    // },
-    // firstName: faker.name.firstName(),
-    // lastName: faker.name.lastName(),
-    // birthDate: faker.date.past(),
-    // telegramUserName: faker.internet.userName(),
-    // mobile: faker.phone.number(),
-    // chiefs: [],
-    // chiefsIds: [],
-    // departmentsIds: [],
-    // role: UserRoles.ROLE_USER,
-    // personalMail: faker.internet.email()
+    avatar: faker.image.abstract(500, 500, true),
+    country: faker.address.country(),
+    status: faker.lorem.lines(),
+    city: faker.address.city(),
+    firstName: faker.name.firstName(),
+    lastName: faker.name.lastName(),
+    telegram: faker.internet.userName(),
+    mobile: faker.phone.number(),
+    emailPersonal: faker.internet.email(),
+    emailSecondary: faker.internet.email(),
+    birthDate: faker.date.past(),
+    employmentDate: faker.date.past()
   })),
   {
     id: '1',
@@ -39,7 +27,18 @@ export const users = [
     password: faker.datatype.uuid(),
     createdAt: faker.date.past(),
     updatedAt: faker.date.future(),
-    avatar: faker.image.abstract(500, 500, true)
+    avatar: faker.image.abstract(500, 500, true),
+    country: faker.address.country(),
+    status: faker.lorem.lines(),
+    city: faker.address.city(),
+    firstName: faker.name.firstName(),
+    lastName: faker.name.lastName(),
+    telegram: faker.internet.userName(),
+    mobile: faker.phone.number(),
+    emailPersonal: faker.internet.email(),
+    emailSecondary: faker.internet.email(),
+    birthDate: faker.date.past(),
+    employmentDate: faker.date.past()
   }
 ];
 

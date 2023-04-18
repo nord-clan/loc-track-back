@@ -1,13 +1,17 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable no-unused-vars */
 /* eslint-disable camelcase */
+import type { IUser } from '../../../models/user';
+import type { Prisma } from '@prisma/client';
 import { generateTokens, secrets } from '../../utils/jwt';
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
 import { v4 as uuid } from 'uuid';
+import { faker } from '@faker-js/faker';
 import { builder } from '#/graphql/builder';
 import UserService from '#/services/user.service';
 import AuthService from '#/services/auth.service';
 import { hashToken } from '#/graphql/utils/hash-token';
+import prisma from '#/prisma';
 
 const service = new UserService();
 const authService = new AuthService();
@@ -80,21 +84,44 @@ builder.mutationField('signIn', (t) =>
     errors: { types: [Error] },
     args: { data: t.arg({ type: UserSignInInput, required: true }) },
     resolve: async (root, args, ctx, info) => {
-      const existing = await service.getByWhere({ where: { login: args.data.login } });
-      if (!existing) {
-        throw new Error('No user found');
-      }
-      const validPassword = await bcrypt.compare(args.data.password, existing.password);
-      if (!validPassword) {
-        throw new Error('Invalid password');
-      }
+      const { user } = await authService.authWithTracker(args.data);
+
+      const userRaw = {
+        login: args.data.login,
+        password: args.data.password, // TODO refactoring raw password !?
+        //
+        city: user.city,
+        firstName: user.firstNameRu,
+        lastName: user.lastNameRu,
+        telegram: user.telegram,
+        mobile: user.mobile,
+        emailPersonal: user.emailPrimary,
+        emailSecondary: user.emailSecondary
+      } as unknown as IUser;
+
+      const upsertedData = (await prisma.user.upsert({
+        create: {
+          ...(userRaw as unknown as Prisma.UserCreateInput),
+          avatar: faker.image.abstract(500, 500, true),
+          country: faker.address.country(),
+          status: faker.lorem.lines(),
+          birthDate: new Date(user.birthDate),
+          employmentDate: new Date(user.employmentDate),
+          createdAt: new Date(user.createdAt),
+          updatedAt: new Date(),
+          role: user?.globalRole === 'USER' ? 'User' : 'Admin'
+        },
+        update: { ...(userRaw as unknown as Prisma.UserUpdateInput) },
+        where: { login: userRaw.login }
+      })) as unknown as IUser;
 
       const jti = uuid();
-      const { accessToken, refreshToken } = generateTokens(existing, jti);
+      const { accessToken, refreshToken } = generateTokens(upsertedData, jti);
+
       await authService.addRefreshTokenToWhitelist({
         jti,
         refreshToken,
-        userId: existing.id
+        userId: upsertedData.id
       });
 
       return {
@@ -129,7 +156,7 @@ builder.mutationField('refreshToken', (t) =>
       if (hashedToken !== savedRefreshToken.hashedToken) {
         throw new Error('Unauthorized');
       }
-      const user = await service.getByWhere({ where: { id: payload.userId } });
+      const user = (await service.getByWhere({ where: { id: payload.userId } })) as IUser | null;
       if (!user) {
         throw new Error('Unauthorized');
       }
@@ -152,47 +179,6 @@ builder.mutationField('refreshToken', (t) =>
         accessToken,
         refreshToken
       };
-    }
-  })
-);
-
-//* ==== Reset password ================================================= *//
-builder.mutationField('resetPassword', (t) =>
-  t.prismaField({
-    description: 'Reset password',
-    type: 'User',
-    errors: { types: [Error] },
-    args: {
-      token: t.arg.string({ required: true }),
-      password: t.arg.string({ required: true })
-    },
-    resolve: async (query, root, args, ctx, info) => {
-      const payload = jwt.verify(args.token, secrets.JWT_PASSWORD_RESET_SECRET) as jwt.JwtPayload;
-      const savedToken = await authService.getVerificationTokenByWhere({
-        where: { id: payload?.jti }
-      });
-      if (!savedToken || savedToken.revoked === true) {
-        throw new Error('Invalid token');
-      }
-      const user = await service.getByWhere({ where: { id: payload.userId } });
-      if (!user) {
-        throw new Error('Invalid token');
-      }
-      const hashedPassword = await bcrypt.hash(args.password, 12);
-
-      const updatedUser = await service.update({
-        query,
-        where: { id: user.id },
-        data: { password: hashedPassword }
-      });
-      await authService.updateRefreshToken({
-        where: { id: savedToken.id },
-        data: {
-          revoked: true
-        }
-      });
-
-      return updatedUser;
     }
   })
 );
