@@ -2,7 +2,7 @@ import { builder } from '../../builder';
 import './query';
 import './mutation';
 
-builder.prismaObject('User', {
+export const UserPrisma = builder.prismaObject('User', {
   fields: (t) => ({
     id: t.exposeID('id'),
 

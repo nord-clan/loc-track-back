@@ -3,10 +3,12 @@
 /* eslint-disable camelcase */
 import type { IUser } from '../../../models/user';
 import type { Prisma } from '@prisma/client';
+import { UserPrisma } from '.';
 import { generateTokens, secrets } from '../../utils/jwt';
 import jwt from 'jsonwebtoken';
 import { v4 as uuid } from 'uuid';
 import { faker } from '@faker-js/faker';
+import bcrypt from 'bcryptjs';
 import { builder } from '#/graphql/builder';
 import UserService from '#/services/user.service';
 import AuthService from '#/services/auth.service';
@@ -15,6 +17,36 @@ import prisma from '#/prisma';
 
 const service = new UserService();
 const authService = new AuthService();
+
+class AuthUser {
+  user: IUser;
+  accessToken: string;
+  refreshToken: string;
+
+  constructor(user: IUser, accessToken: string, refreshToken: string) {
+    this.user = user;
+    this.accessToken = accessToken;
+    this.refreshToken = refreshToken;
+  }
+}
+
+const AuthedUser = builder.objectType(AuthUser, {
+  name: 'AuthedUser',
+  fields: (t) => ({
+    user: t.field({
+      type: UserPrisma,
+      resolve: (v) => v.user as unknown as typeof UserPrisma
+    }),
+    accessToken: t.exposeString('accessToken'),
+    refreshToken: t.exposeString('refreshToken')
+  })
+});
+
+interface IAuthUser {
+  user: IUser;
+  accessToken: string;
+  refreshToken: string;
+}
 
 //* ==== SignUp User ==================================================== *//
 export interface IUserSignUpInput {
@@ -30,18 +62,52 @@ const UserSignUpInput = builder.inputRef<IUserSignUpInput>('UserSignUpInput').im
 });
 
 builder.mutationField('signUp', (t) =>
-  t.prismaField({
-    description: '-',
-    type: 'User',
-    args: { data: t.arg({ type: UserSignUpInput, required: true }) },
+  t.field({
+    description: 'Sign up user',
+    type: AuthedUser,
     errors: { types: [Error] },
-    resolve: async (query, root, args, ctx, info) => {
-      //* if user already exists throw error
-      const existing = await service.getByWhere({ query, where: { login: args.data.login } });
+    args: { data: t.arg({ type: UserSignUpInput, required: true }) },
+    resolve: async (root, args, ctx, info) => {
+      const existing = await service.getByWhere({ where: { login: args.data.login } });
       if (existing) {
         throw new Error('User already exists please signIn');
       }
-      return service.post(args.data);
+
+      //? mock
+      const paylaod = {
+        ...args.data,
+        avatar: faker.image.abstract(500, 500, true),
+        city: faker.address.city(),
+        country: faker.address.country(),
+        status: faker.lorem.lines(),
+        birthDate: faker.date.past(),
+        employmentDate: faker.date.past(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        firstName: faker.name.firstName(),
+        lastName: faker.name.lastName(),
+        telegram: faker.internet.userName(),
+        mobile: faker.phone.number(),
+        emailPersonal: faker.internet.email(),
+        emailSecondary: faker.internet.email(),
+        role: 'User'
+      };
+
+      const user = await service.post(paylaod);
+
+      const jti = uuid();
+      const { accessToken, refreshToken } = generateTokens(user, jti);
+      await authService.addRefreshTokenToWhitelist({
+        jti,
+        refreshToken,
+        userId: user.id
+      });
+
+      return {
+        user,
+        accessToken,
+        refreshToken
+      };
     }
   })
 );
@@ -59,28 +125,11 @@ const UserSignInInput = builder.inputRef<IUserSignInInput>('UserSignInInput').im
   })
 });
 
-class Token {
-  accessToken: string;
-  refreshToken: string;
-
-  constructor(accessToken: string, refreshToken: string) {
-    this.accessToken = accessToken;
-    this.refreshToken = refreshToken;
-  }
-}
-
-const UserSignInPayload = builder.objectType(Token, {
-  name: 'UserSignInPayload',
-  fields: (t) => ({
-    accessToken: t.exposeString('accessToken'),
-    refreshToken: t.exposeString('refreshToken')
-  })
-});
-
-builder.mutationField('signIn', (t) =>
+// TODO REMOVE
+builder.mutationField('signInWithTracker', (t) =>
   t.field({
     description: 'Sign in',
-    type: UserSignInPayload,
+    type: AuthUser,
     errors: { types: [Error] },
     args: { data: t.arg({ type: UserSignInInput, required: true }) },
     resolve: async (root, args, ctx, info) => {
@@ -88,7 +137,7 @@ builder.mutationField('signIn', (t) =>
 
       const userRaw = {
         login: args.data.login,
-        password: args.data.password, // TODO refactoring raw password !?
+        password: bcrypt.hashSync(args.data.password, 12),
         //
         city: user.city,
         firstName: user.firstNameRu,
@@ -99,6 +148,7 @@ builder.mutationField('signIn', (t) =>
         emailSecondary: user.emailSecondary
       } as unknown as IUser;
 
+      // ? mock
       const upsertedData = (await prisma.user.upsert({
         create: {
           ...(userRaw as unknown as Prisma.UserCreateInput),
@@ -114,6 +164,9 @@ builder.mutationField('signIn', (t) =>
         update: { ...(userRaw as unknown as Prisma.UserUpdateInput) },
         where: { login: userRaw.login }
       })) as unknown as IUser;
+
+      // TODO
+      // ? service.post(userRaw);
 
       const jti = uuid();
       const { accessToken, refreshToken } = generateTokens(upsertedData, jti);
@@ -132,11 +185,45 @@ builder.mutationField('signIn', (t) =>
   })
 );
 
+builder.mutationField('signIn', (t) =>
+  t.field({
+    description: 'Sign in',
+    type: AuthedUser,
+    errors: { types: [Error] },
+    args: { data: t.arg({ type: UserSignInInput, required: true }) },
+    resolve: async (root, args, ctx, info) => {
+      const existing = await service.getByWhere({ where: { login: args.data.login } });
+
+      if (!existing) {
+        throw new Error('No user found');
+      }
+      const validPassword = await bcrypt.compare(args.data.password, existing.password);
+      if (!validPassword) {
+        throw new Error('Invalid password');
+      }
+
+      const jti = uuid();
+      const { accessToken, refreshToken } = generateTokens(existing, jti);
+      await authService.addRefreshTokenToWhitelist({
+        jti,
+        refreshToken,
+        userId: existing.id
+      });
+
+      return {
+        user: existing,
+        accessToken,
+        refreshToken
+      };
+    }
+  })
+);
+
 //* ==== Refresh token ================================================== *//
 builder.mutationField('refreshToken', (t) =>
   t.field({
     description: 'Refreshes the access token',
-    type: UserSignInPayload,
+    type: AuthUser,
     errors: { types: [Error] },
     args: {
       refreshToken: t.arg({

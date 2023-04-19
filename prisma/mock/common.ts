@@ -24,7 +24,7 @@ export const layers = [
     id: '2',
     index: 2,
     name: 'Второй этаж',
-    img: '/assets/office.svg',
+    img: '/assets/office.png',
     officeId: '1'
   },
   {
@@ -32,6 +32,13 @@ export const layers = [
     index: 3,
     name: 'Третий этаж',
     img: null,
+    officeId: '1'
+  },
+  {
+    id: '4',
+    index: 4,
+    name: 'Третий этаж',
+    img: '/assets/office.svg',
     officeId: '1'
   }
 ];
