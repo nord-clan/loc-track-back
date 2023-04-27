@@ -7,6 +7,7 @@ dotenv.config({
 });
 
 export default {
+  ssl: (process.env.SSL || 'false') === 'true',
   host: process.env.HOST || 'localhost',
   port: +(process.env.PORT || 8080),
   redis: {

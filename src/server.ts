@@ -1,5 +1,4 @@
 /* eslint-disable no-underscore-dangle */
-import 'reflect-metadata';
 import type { Request, Response } from 'express';
 import type { IRedisOptions, RedisGateway } from './redis/redis.gateway';
 import type { SocketGateway } from './socket/socket.gateway';
@@ -16,32 +15,33 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import { createYoga } from 'graphql-yoga';
-import os from 'os';
 import http from 'http';
+import https from 'https';
+import os from 'os';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 export interface IServerOptions {
   host: string;
   port: number;
   redis: IRedisOptions;
+  ssl?: boolean;
 }
 
 class Server {
-  private webServer: http.Server;
+  private webServer!: http.Server | https.Server;
   private server: express.Application;
   private options!: IServerOptions;
   private socketGateway!: SocketGateway;
   private redisGateway!: RedisGateway;
 
   constructor() {
-    const server = express();
-    const webServer = http.createServer(server);
-
-    this.webServer = webServer;
-    this.server = server;
+    this.server = express();
   }
 
   public async import(options: IServerOptions) {
     this.options = options;
+    this.webServer = this.createServer(this.server);
     // TODO this.redisGateway = new RedisGateway(this.options.redis);
     // TODO this.socketGateway = new SocketGateway(this.webServer);
 
@@ -55,11 +55,11 @@ class Server {
 
   public async listen() {
     try {
-      const { port } = this.options;
+      const { port, ssl } = this.options;
       await this.webServer.listen(port);
 
       console.log('\x1B[34m%s', '---------------------------------------');
-      console.log(`✨ server listening on the port ${config.port}`);
+      console.log(`✨ Server listening port ${config.port} on ${ssl ? 'HTTPS' : 'HTTP'}`);
       console.log(`✨ ${os.hostname()}`);
       console.log('\x1B[34m%s', `GraphQL playground /graphql \n`);
       this.server._router.stack.forEach(print.bind(null, []));
@@ -155,6 +155,23 @@ class Server {
       console.log('\x1B[32m%s\x1B[0m', '✅ NodeExceptions');
     } catch (e) {
       console.log('\x1b[31m%s\x1B[0m', '❌ NodeExceptions');
+    }
+  }
+
+  private createServer(server: express.Application) {
+    try {
+      const httpsOptions = {
+        key: readFileSync(join(__dirname, '../ssl/', 'localhost-key.pem')),
+        cert: readFileSync(join(__dirname, '../ssl/', 'localhost.pem'))
+      };
+
+      this.options.ssl = true;
+      console.log('\x1B[32m%s\x1B[0m', '✅ Create HTTPS server');
+      return https.createServer(httpsOptions, server);
+    } catch (e) {
+      this.options.ssl = false;
+      console.log('\x1b[31m%s\x1B[0m', '❌ Create HTTPS server');
+      return http.createServer(server);
     }
   }
 
