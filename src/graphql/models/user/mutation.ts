@@ -35,7 +35,7 @@ const AuthedUser = builder.objectType(AuthUser, {
   fields: (t) => ({
     user: t.field({
       type: UserPrisma,
-      resolve: (v) => v.user as unknown as typeof UserPrisma
+      resolve: (v) => v.user as any
     }),
     accessToken: t.exposeString('accessToken'),
     refreshToken: t.exposeString('refreshToken')
@@ -107,7 +107,7 @@ builder.mutationField('signUp', (t) =>
         user,
         accessToken,
         refreshToken
-      };
+      } as any;
     }
   })
 );
@@ -180,7 +180,7 @@ builder.mutationField('signInWithTracker', (t) =>
       return {
         accessToken,
         refreshToken
-      };
+      } as any;
     }
   })
 );
@@ -214,7 +214,7 @@ builder.mutationField('signIn', (t) =>
         user: existing,
         accessToken,
         refreshToken
-      };
+      } as any;
     }
   })
 );
@@ -265,7 +265,7 @@ builder.mutationField('refreshToken', (t) =>
       return {
         accessToken,
         refreshToken
-      };
+      } as any;
     }
   })
 );

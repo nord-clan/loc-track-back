@@ -1,4 +1,5 @@
 import type { IUser } from '#/models/user';
+import type { User } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 
 export const AUTH_SECRET = process.env.AUTH_SECRET as string;
@@ -10,13 +11,13 @@ export const secrets = {
   JWT_PASSWORD_RESET_SECRET: `${AUTH_SECRET}password-reset`
 };
 
-export const generateAccessToken = (user: IUser, options?: jwt.SignOptions) =>
+export const generateAccessToken = (user: IUser | User, options?: jwt.SignOptions) =>
   jwt.sign({ userId: user.id }, secrets.JWT_ACCESS_SECRET as string, {
     // expiresIn: '1d',
     ...options
   });
 
-export const generateRefreshToken = (user: IUser, jti: string) =>
+export const generateRefreshToken = (user: IUser | User, jti: string) =>
   jwt.sign(
     {
       userId: user.id,
@@ -28,7 +29,7 @@ export const generateRefreshToken = (user: IUser, jti: string) =>
     }
   );
 
-export const generateTokens = (user: IUser, jti: string, options?: jwt.SignOptions) => ({
+export const generateTokens = (user: IUser | User, jti: string, options?: jwt.SignOptions) => ({
   accessToken: generateAccessToken(user, options),
   refreshToken: generateRefreshToken(user, jti)
 });
